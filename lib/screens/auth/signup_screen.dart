@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '/services/auth_service.dart';
+import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -281,8 +282,13 @@ void _handleSignup() async {
                   const Text("Already have an account ? "),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(context, "/login");
-                    },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const LoginScreen(),
+    ),
+  );
+},
                     child: const Text(
                       "Login here",
                       style: TextStyle(

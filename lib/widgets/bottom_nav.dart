@@ -9,6 +9,7 @@ import '/screens/kasir/home_screen.dart';
 import '/screens/dashboard_screen.dart';
 import '/screens/produk/produk_screen.dart';
 import '/screens/produk/stok_produk_screen.dart';
+import '/screens/kasir/struk_cash.dart';
 
 class BottomNav extends StatelessWidget {
   const BottomNav({super.key});

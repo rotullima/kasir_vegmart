@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '/widgets/bottom_nav.dart'; // IMPORT BOTTOM NAV
+import '/widgets/bottom_nav.dart';
+import '/screens/kasir/struk_cash.dart';
 
 class Keranjang extends StatefulWidget {
   const Keranjang({super.key});
@@ -11,13 +12,46 @@ class Keranjang extends StatefulWidget {
 class _KeranjangPageState extends State<Keranjang> {
   String metodePembayaran = "";
 
+  // ==================== DATA KERANJANG ====================
+  List<Map<String, dynamic>> cartItems = [
+    {
+      "img": "assets/images/cabe.png",
+      "title": "cabe kecil",
+      "qty": "250/0gr",
+      "harga": "RP 24.500",
+      "jumlah": 1
+    },
+    {
+      "img": "assets/images/jagung.png",
+      "title": "jagung",
+      "qty": "500/0gr",
+      "harga": "RP 8.000",
+      "jumlah": 2
+    },
+    {
+      "img": "assets/images/ubi.png",
+      "title": "ubi ungu",
+      "qty": "500/0gr",
+      "harga": "RP 3.000",
+      "jumlah": 1
+    },
+    {
+      "img": "assets/images/pakcoy.png",
+      "title": "pakcoy",
+      "qty": "400/0gr",
+      "harga": "RP 5.500",
+      "jumlah": 1
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
+      // ==================== HEADER ====================
       body: Column(
         children: [
-          // HEADER
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             width: double.infinity,
@@ -31,10 +65,7 @@ class _KeranjangPageState extends State<Keranjang> {
                 const SizedBox(width: 10),
                 const Text(
                   "keranjang",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 const Icon(Icons.shopping_cart_outlined, size: 28),
@@ -42,52 +73,98 @@ class _KeranjangPageState extends State<Keranjang> {
             ),
           ),
 
-          // LIST PRODUK
+          // ==================== LIST PRODUK ====================
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  itemCard(
-                    img: "assets/images/cabe.png",
-                    title: "cabe kecil",
-                    qty: "250/0gr",
-                    harga: "RP 24.500",
-                    jumlah: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  itemCard(
-                    img: "assets/images/jagung.png",
-                    title: "jagung",
-                    qty: "500/0gr",
-                    harga: "RP 8.000",
-                    jumlah: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  itemCard(
-                    img: "assets/images/ubi.png",
-                    title: "ubi ungu",
-                    qty: "500/0gr",
-                    harga: "RP 3.000",
-                    jumlah: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  itemCard(
-                    img: "assets/images/pakcoy.png",
-                    title: "pakcoy",
-                    qty: "400/0gr",
-                    harga: "RP 5.500",
-                    jumlah: 1,
-                  ),
+                  ...cartItems.map((item) {
+                    return Column(
+                      children: [
+                        Dismissible(
+                          key: Key(item["title"]),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(Icons.delete,
+                                color: Colors.white, size: 28),
+                          ),
+
+                          // ===== KONFIRMASI POPUP =====
+                          confirmDismiss: (direction) async {
+                            return await showDialog(
+                              context: context,
+                              builder: (context) {
+                                return AlertDialog(
+                                  backgroundColor: const Color(0xFFF09488),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Anda ingin menghapus item "${item["title"]}"?',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          ElevatedButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, true),
+                                              child: const Text("iya")),
+                                          ElevatedButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, false),
+                                              child: const Text("tidak")),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+
+                          // ===== HAPUS ITEM =====
+                          onDismissed: (direction) {
+                            setState(() {
+                              cartItems.remove(item);
+                            });
+                          },
+
+                          child: itemCard(
+                            img: item["img"],
+                            title: item["title"],
+                            qty: item["qty"],
+                            harga: item["harga"],
+                            jumlah: item["jumlah"],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  }).toList(),
+
                   const SizedBox(height: 25),
 
-                  // METODE PEMBAYARAN
+                  // ==================== METODE PEMBAYARAN ====================
                   const Text(
                     "Metode Pembayaran",
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 10),
@@ -122,11 +199,11 @@ class _KeranjangPageState extends State<Keranjang> {
 
                   const SizedBox(height: 20),
 
-                  // TOTAL
+                  // ==================== TOTAL ====================
                   Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -158,11 +235,17 @@ class _KeranjangPageState extends State<Keranjang> {
 
                   const SizedBox(height: 20),
 
-                  // BUTTON
+                  // ==================== BUTTON CHECKOUT ====================
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => StrukCash()),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF8BC34A),
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -183,7 +266,7 @@ class _KeranjangPageState extends State<Keranjang> {
         ],
       ),
 
-      // PAKAI WIDGET BOTTOM NAV
+      // ================= BOTTOM NAV =================
       bottomNavigationBar: const BottomNav(),
     );
   }
@@ -197,6 +280,7 @@ class _KeranjangPageState extends State<Keranjang> {
     required int jumlah,
   }) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFDDEDC6),
@@ -229,7 +313,8 @@ class _KeranjangPageState extends State<Keranjang> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             decoration: BoxDecoration(
               color: const Color(0xFF8BC34A),
               borderRadius: BorderRadius.circular(30),
@@ -237,7 +322,9 @@ class _KeranjangPageState extends State<Keranjang> {
             child: Text(
               "+ $jumlah",
               style: const TextStyle(
-                  fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                  fontSize: 18,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold),
             ),
           )
         ],

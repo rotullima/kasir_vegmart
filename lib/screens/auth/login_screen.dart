@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '/screens/kasir/home_screen.dart';
 import '/services/auth_service.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -210,8 +211,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text("Don't have an account ? "),
                 GestureDetector(
                   onTap: () {
-                    Navigator.pushNamed(context, "/signup");
-                  },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const SignupScreen(),
+    ),
+  );
+},
                   child: const Text(
                     "Sign up",
                     style: TextStyle(

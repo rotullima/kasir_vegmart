@@ -233,7 +233,7 @@ class ConfirmationPage extends StatelessWidget {
 
                 // Text terima kasih + nomor order
                 Column(
-                  children: const [
+                  children: const [ 
                     Text(
                       'terimakasi telah berbelanja bersama kami',
                       style: TextStyle(

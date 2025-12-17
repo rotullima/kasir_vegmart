@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '/widgets/bottom_nav.dart';
+import '/services/stock_service.dart';
 
 class StokProdukScreen extends StatefulWidget {
   const StokProdukScreen({super.key});
@@ -9,132 +10,104 @@ class StokProdukScreen extends StatefulWidget {
 }
 
 class _StokProdukScreenState extends State<StokProdukScreen> {
-  // Data stok
-  List<Map<String, dynamic>> stokList = [
-    {"nama": "Jagung", "stok": "13 kg", "img": "jagung.png"},
-    {"nama": "cabe", "stok": "5 kg", "img": "cabe.png"},
-    {"nama": "apel", "stok": "20 kg", "img": "apel.png"},
-    {"nama": "pisang", "stok": "15 ikat", "img": "pisang.png"},
-    {"nama": "selada", "stok": "7 kg", "img": "selada.png"},
-    {"nama": "terong", "stok": "15 kg", "img": "terong.png"},
-    {"nama": "tomat", "stok": "7 kg", "img": "tomat.png"},
-  ];
+  final StokService stokService = StokService();
+  List<Map<String, dynamic>> stokList = [];
+  bool isLoading = true;
 
-  TextEditingController editStokController = TextEditingController();
+  final TextEditingController editStokController = TextEditingController();
 
-  // Show popup edit produk
-  void showEditPopup(int index) {
-    editStokController.text = stokList[index]["stok"];
+  @override
+  void initState() {
+    super.initState();
+    fetchStok();
+  }
+
+  Future<void> fetchStok() async {
+    setState(() => isLoading = true);
+    try {
+      final data = await stokService.getAllStok();
+      stokList = data;
+    } catch (e) {
+      debugPrint('FETCH STOK ERROR: $e');
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void showEditPopup(Map<String, dynamic> item) {
+    editStokController.text = item['jumlah_stok'].toString();
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              width: 300,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4))
-                ],
+      builder: (_) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Edit Stok"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  item['PRODUK']['gambar'] ?? '',
+                  height: 70,
+                  width: 70,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.image, size: 50),
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Gambar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      "assets/images/${stokList[index]["img"]}",
-                      height: 70,
-                      width: 70,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  const Text(
-                    "EDIT PRODUK",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-
-                  Text("nama produk : ${stokList[index]["nama"]}"),
-                  const SizedBox(height: 5),
-
-                  // Edit stok input
-                  TextField(
-                    controller: editStokController,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: "stok terbaru",
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Tombol Cancel
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close, color: Colors.white),
-                        ),
-                      ),
-
-                      // Tombol Simpan
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            stokList[index]["stok"] = editStokController.text;
-                          });
-
-                          Navigator.pop(context); // tutup popup edit
-
-                          // muncul popup berhasil
-                          showSuccessPopup();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.check, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              const SizedBox(height: 12),
+              Text(
+                item['PRODUK']['nama_produk'],
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-            ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: editStokController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(labelText: "Stok terbaru (kg)"),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final stokBaru =
+                    int.tryParse(editStokController.text) ?? 0;
+
+                await stokService.updateStok(
+  stokId: item['id'], // ⬅️ ini ID row STOK
+  stokBaru: stokBaru,
+);
+
+
+                await fetchStok();
+                if (mounted) Navigator.pop(context, true);
+
+                showSuccessPopup();
+              },
+              child: const Text("Simpan"),
+            ),
+          ],
         );
       },
     );
   }
 
-  // Popup berhasil diperbarui
   void showSuccessPopup() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (_) {
         Future.delayed(const Duration(seconds: 1), () {
           Navigator.pop(context);
         });
@@ -143,33 +116,25 @@ class _StokProdukScreenState extends State<StokProdukScreen> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              padding: const EdgeInsets.all(25),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4))
-                ],
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Column(
+              child: const Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   CircleAvatar(
-                    radius: 30,
+                    radius: 28,
                     backgroundColor: Colors.green,
-                    child: Icon(Icons.check, color: Colors.white, size: 35),
+                    child: Icon(Icons.check, color: Colors.white, size: 30),
                   ),
-                  SizedBox(height: 15),
+                  SizedBox(height: 12),
                   Text(
-                    "Berhasil Diperbarui",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
+                    "Stok berhasil diperbarui",
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
@@ -179,13 +144,11 @@ class _StokProdukScreenState extends State<StokProdukScreen> {
     );
   }
 
-  // ============================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFA3D87C),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       bottomNavigationBar: const BottomNav(),
-
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFFA3D87C),
@@ -195,117 +158,65 @@ class _StokProdukScreenState extends State<StokProdukScreen> {
         ),
         centerTitle: true,
         title: const Text(
-          "Manajeent Stok",
+          "Manajemen Stok",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.shopping_cart_outlined, color: Colors.black),
-          ),
-        ],
       ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: stokList.length,
+              itemBuilder: (context, i) {
+                final item = stokList[i];
+                final produk = item['PRODUK'];
 
-      body: Column(
-        children: [
-          const SizedBox(height: 10),
-
-          // SEARCH BAR
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 45,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const TextField(
-                decoration: InputDecoration(
-                    hintText: "searching...",
-                    prefixIcon: Icon(Icons.search),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.only(top: 10)),
-              ),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA3D87C),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          produk['gambar'] ?? '',
+                          height: 50,
+                          width: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.image),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            produk['nama_produk'],
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            "stok = ${item['jumlah_stok']} kg",
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => showEditPopup(item),
+                      )
+                    ],
+                  ),
+                );
+              },
             ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ================= LIST ITEM =================
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE7F5DA),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-              ),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: stokList.length,
-                itemBuilder: (context, i) {
-                  return stokItem(i);
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== CARD ITEM ====================
-  Widget stokItem(int i) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFA3D87C),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              "assets/images/${stokList[i]["img"]}",
-              height: 50,
-              width: 50,
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stokList[i]["nama"],
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-              ),
-              Text("stok = ${stokList[i]["stok"]}",
-                  style: const TextStyle(fontSize: 13)),
-              const Text("update terakhir 12-11-2023",
-                  style: TextStyle(fontSize: 11)),
-            ],
-          ),
-
-          const Spacer(),
-
-          GestureDetector(
-            onTap: () => showEditPopup(i),
-            child: Container(
-              height: 30,
-              width: 30,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.edit, size: 18),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

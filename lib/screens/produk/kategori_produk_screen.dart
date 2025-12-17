@@ -29,103 +29,133 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
     fetchProducts();
   }
 
-  
   Future<void> fetchProducts() async {
-  setState(() => isLoading = true);
-  try {
-    produkList = await productService.getProductsByCategory(widget.title);
-    print("Kategori dikirim: '${widget.title}'");
-    print("Hasil query: $produkList");
-  } catch (e) {
-    print("ERROR: $e");
-    produkList = [];
-  } finally {
-    setState(() => isLoading = false);
+    setState(() => isLoading = true);
+    try {
+      produkList = await productService.getProductsByCategory(widget.title);
+      print("Kategori dikirim: '${widget.title}'");
+      print("Hasil query: $produkList");
+    } catch (e) {
+      print("ERROR: $e");
+      produkList = [];
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
-}
 
   Future<void> showProductPopup({Map<String, dynamic>? data}) async {
     final nameCtrl = TextEditingController(text: data?['nama_produk'] ?? '');
-    final hargaCtrl = TextEditingController(text: data?['harga_produk']?.toString() ?? '');
-    final stokCtrl = TextEditingController(text: data?['stok']?.toString() ?? '');
+    final hargaCtrl = TextEditingController(
+      text: data?['harga_produk']?.toString() ?? '',
+    );
+    final stokCtrl = TextEditingController(
+      text: data?['stok']?.toString() ?? '',
+    );
+    final isEdit = data != null;
     File? pickedImg;
     String? existingImg = data?['gambar'];
 
     await showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(builder: (context, setStateDialog) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Text(data == null ? "Tambah Produk" : "Edit Produk"),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: () async {
-                      pickedImg = await productService.pickImage();
-                      setStateDialog(() {});
-                    },
-                    child: CircleAvatar(
-                      radius: 45,
-                      backgroundImage: pickedImg != null
-                          ? FileImage(pickedImg!)
-                          : (existingImg != null ? NetworkImage(existingImg) : null) as ImageProvider?,
-                      child: (pickedImg == null && existingImg == null)
-                          ? const Icon(Icons.camera_alt, size: 30)
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Nama Produk")),
-                  TextField(
-                    controller: hargaCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Harga Produk"),
-                  ),
-                  TextField(
-                    controller: stokCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Stok"),
-                  ),
-                ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    if (data == null) {
-                      await productService.addProduct(
-                        name: nameCtrl.text,
-                        harga: num.parse(hargaCtrl.text),
-                        kategori: widget.title,
-                        image: pickedImg,
-                      );
-                    } else {
-                      await productService.updateProduct(
-                        id: data['id'],
-                        name: nameCtrl.text,
-                        harga: num.parse(hargaCtrl.text),
-                        kategori: widget.title,
-                        image: pickedImg,
+              title: Text(data == null ? "Tambah Produk" : "Edit Produk"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        pickedImg = await productService.pickImage();
+                        setStateDialog(() {});
+                      },
+                      child: CircleAvatar(
+                        radius: 45,
+                        backgroundImage: pickedImg != null
+                            ? FileImage(pickedImg!)
+                            : (existingImg != null
+                                      ? NetworkImage(existingImg)
+                                      : null)
+                                  as ImageProvider?,
+                        child: (pickedImg == null && existingImg == null)
+                            ? const Icon(Icons.camera_alt, size: 30)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: "Nama Produk",
+                      ),
+                    ),
+                    TextField(
+                      controller: hargaCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Harga Produk",
+                      ),
+                    ),
+                    if (!isEdit)
+                      TextField(
+                        controller: stokCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: "Stok Awal (kg)",
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Batal"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final stokValue = int.tryParse(stokCtrl.text) ?? 0;
+                      final hargaValue = num.tryParse(hargaCtrl.text) ?? 0;
+
+                      if (data == null) {
+                        await productService.addProduct(
+                          name: nameCtrl.text,
+                          harga: hargaValue,
+                          kategori: widget.title,
+                          image: pickedImg,
+                          stok: stokValue,
+                        );
+                      } else {
+                        await productService.updateProduct(
+                          id: data['id'],
+                          name: nameCtrl.text,
+                          harga: hargaValue,
+                          kategori: widget.title,
+                          image: pickedImg,
+                          stok: stokValue, // ← INI PENTING
+                        );
+                      }
+
+                      await fetchProducts();
+                      if (mounted) Navigator.pop(context);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Gagal simpan produk: $e")),
                       );
                     }
-                    await fetchProducts();
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Gagal simpan produk: $e")),
-                    );
-                  }
-                },
-                child: const Text("Simpan"),
-              ),
-            ],
-          );
-        });
+                  },
+                  child: const Text("Simpan"),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
@@ -135,9 +165,9 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
       await productService.deleteProduct(id);
       await fetchProducts();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal hapus produk: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Gagal hapus produk: $e")));
     }
   }
 
@@ -163,11 +193,14 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             right: 16,
             bottom: 16,
             child: FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const StokProdukScreen()),
                 );
+
+                // PENTING 🔥
+                await fetchProducts();
               },
               backgroundColor: const Color(0xFF5F6635),
               foregroundColor: Colors.white,
@@ -186,11 +219,18 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             color: const Color(0xFF5F6635),
             child: Row(
               children: [
-                InkWell(onTap: () => Navigator.pop(context), child: const Icon(Icons.arrow_back, color: Colors.white)),
+                InkWell(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
                 const SizedBox(width: 12),
                 Text(
                   widget.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -199,7 +239,10 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+              ),
               child: const TextField(
                 decoration: InputDecoration(
                   border: InputBorder.none,
@@ -213,7 +256,12 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(widget.headerImage, height: 140, width: double.infinity, fit: BoxFit.cover),
+              child: Image.asset(
+                widget.headerImage,
+                height: 140,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -221,59 +269,84 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : produkList.isEmpty
-                    ? const Center(child: Text("Belum ada produk"))
-                    : RefreshIndicator(
-                        onRefresh: fetchProducts,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: produkList.length,
-                          itemBuilder: (context, i) {
-                            final item = produkList[i];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(color: const Color(0xFFCDE6A3), borderRadius: BorderRadius.circular(12)),
-                              child: Row(
+                ? const Center(child: Text("Belum ada produk"))
+                : RefreshIndicator(
+                    onRefresh: fetchProducts,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: produkList.length,
+                      itemBuilder: (context, i) {
+                        final item = produkList[i];
+                        final stokList = item['STOK'] as List?;
+                        final stok = (stokList != null && stokList.isNotEmpty)
+                            ? stokList[0]['jumlah_stok']
+                            : 0;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCDE6A3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(50),
+                                child: Image.network(
+                                  item["gambar"] ?? '',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.image),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item["nama_produk"],
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      "harga = ${item["harga_produk"]}",
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+
+                                    Text("stok = $stok kg"),
+                                  ],
+                                ),
+                              ),
+                              Column(
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(50),
-                                    child: Image.network(
-                                      item["gambar"] ?? '',
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                                  IconButton(
+                                    onPressed: () =>
+                                        showProductPopup(data: item),
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Colors.black,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(item["nama_produk"], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                                        Text("harga = ${item["harga_produk"]}", style: const TextStyle(fontSize: 14)),
-                                        Text("stok = ${item["stok"]?["jumlah_stok"] ?? 0}"),
-                                      ],
+                                  IconButton(
+                                    onPressed: () => deleteProduct(item['id']),
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
                                     ),
-                                  ),
-                                  Column(
-                                    children: [
-                                      IconButton(
-                                        onPressed: () => showProductPopup(data: item),
-                                        icon: const Icon(Icons.edit, color: Colors.black),
-                                      ),
-                                      IconButton(
-                                        onPressed: () => deleteProduct(item['id']),
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                      ),
-                                    ],
                                   ),
                                 ],
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),

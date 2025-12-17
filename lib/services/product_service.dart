@@ -20,12 +20,21 @@ Future<List<Map<String, dynamic>>> getAllProducts() async {
 Future<List<Map<String, dynamic>>> getProductsByCategory(String kategori) async {
   final res = await supabase
       .from('PRODUK')
-      .select(''', *, "STOK"(jumlah_stok) ''')
-      .ilike('kategori', '%${kategori.trim()}%');
+      .select('''
+        id,
+        nama_produk,
+        harga_produk,
+        kategori,
+        gambar,
+        STOK (
+          jumlah_stok
+        )
+      ''')
+      .eq('kategori', kategori.trim());
 
-  print("Kategori '$kategori' → hasil: $res");
   return List<Map<String, dynamic>>.from(res);
 }
+
 
 
 
@@ -72,47 +81,73 @@ Future<List<Map<String, dynamic>>> getProductsByCategory(String kategori) async 
 
   /// Update produk
   Future<void> updateProduct({
-    required int id,
-    String? name,
-    num? harga,
-    String? kategori,
-    File? image,
-    int? stok,
-  }) async {
-    String? url;
-    if (image != null) url = await uploadImage(image);
+  required int id,
+  String? name,
+  num? harga,
+  String? kategori,
+  File? image,
+  int? stok,
+}) async {
+  String? url;
+  if (image != null) url = await uploadImage(image);
 
-    // Update produk
-    await supabase.from('PRODUK').update({
-      if (name != null) 'nama_produk': name,
-      if (harga != null) 'harga_produk': harga,
-      if (kategori != null) 'kategori': kategori,
-      if (url != null) 'gambar': url,
-    }).eq('id', id);
+  await supabase.from('PRODUK').update({
+    if (name != null) 'nama_produk': name,
+    if (harga != null) 'harga_produk': harga,
+    if (kategori != null) 'kategori': kategori,
+    if (url != null) 'gambar': url,
+  }).eq('id', id);
 
-    // Update stok kalau ada
-    if (stok != null) {
-      final existing = await supabase.from('STOK').select().eq('produk_id', id);
-      if (existing.isEmpty) {
-        // kalau stok belum ada, insert
-        await supabase.from('STOK').insert({'produk_id': id, 'jumlah_stok': stok});
-      } else {
-        // kalau sudah ada, update
-        await supabase
-            .from('STOK')
-            .update({'jumlah_stok': stok})
-            .eq('produk_id', id);
-      }
+  if (stok != null) {
+    final existing = await supabase
+        .from('STOK')
+        .select('id')
+        .eq('produk_id', id);
+
+    if (existing.isEmpty) {
+      await supabase.from('STOK').insert({
+        'produk_id': id,
+        'jumlah_stok': stok,
+      });
+    } else {
+      await supabase
+          .from('STOK')
+          .update({'jumlah_stok': stok})
+          .eq('produk_id', id);
     }
   }
+}
+
 
   /// Hapus produk
   Future<void> deleteProduct(int id) async {
-    // Hapus dulu detail penjualan
-    await supabase.from('DETAILPENJUALAN').delete().eq('produk_id', id);
-    // Hapus stok
-    await supabase.from('STOK').delete().eq('produk_id', id);
-    // Hapus produk
-    await supabase.from('PRODUK').delete().eq('id', id);
+  try {
+    final d1 = await supabase
+        .from('DETAILPENJUALAN')
+        .delete()
+        .eq('produk_id', id)
+        .select();
+
+    final d2 = await supabase
+        .from('STOK')
+        .delete()
+        .eq('produk_id', id)
+        .select();
+
+    final d3 = await supabase
+        .from('PRODUK')
+        .delete()
+        .eq('id', id)
+        .select();
+
+    print('DETAILPENJUALAN deleted: $d1');
+    print('STOK deleted: $d2');
+    print('PRODUK deleted: $d3');
+  } catch (e) {
+    print('DELETE ERROR: $e');
+    rethrow;
   }
+}
+
+
 }

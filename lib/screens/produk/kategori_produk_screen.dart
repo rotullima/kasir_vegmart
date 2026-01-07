@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data'; // Ditambahkan untuk Uint8List
 import 'package:flutter/material.dart';
 import '/widgets/bottom_nav.dart';
 import 'stok_produk_screen.dart';
@@ -32,14 +32,33 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
   Future<void> fetchProducts() async {
     setState(() => isLoading = true);
     try {
-      produkList = await productService.getProductsByCategory(widget.title);
+      final res = await productService.supabase
+          .from('PRODUK')
+          .select('''
+            id,
+            nama_produk,
+            harga_produk,
+            kategori,
+            gambar,
+            STOK!inner (
+              id,
+              jumlah_stok,
+              created_at
+            )
+          ''')
+          .eq('kategori', widget.title)
+          .order('created_at', referencedTable: 'STOK', ascending: false);
+
+      produkList = List<Map<String, dynamic>>.from(res);
       print("Kategori dikirim: '${widget.title}'");
       print("Hasil query: $produkList");
     } catch (e) {
       print("ERROR: $e");
       produkList = [];
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -49,10 +68,14 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
       text: data?['harga_produk']?.toString() ?? '',
     );
     final stokCtrl = TextEditingController(
-      text: data?['stok']?.toString() ?? '',
+      text: data?['STOK'] != null && (data?['STOK'] as List).isNotEmpty
+          ? (data?['STOK'] as List).first['jumlah_stok']?.toString() ?? ''
+          : '',
     );
     final isEdit = data != null;
-    File? pickedImg;
+
+    Uint8List? pickedImgBytes;
+    String? pickedImgName;
     String? existingImg = data?['gambar'];
 
     await showDialog(
@@ -71,18 +94,22 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
                   children: [
                     GestureDetector(
                       onTap: () async {
-                        pickedImg = await productService.pickImage();
-                        setStateDialog(() {});
+                        final result = await productService.pickImageBytes();
+                        if (result != null) {
+                          setStateDialog(() {
+                            pickedImgBytes = result.$1;
+                            pickedImgName = result.$2;
+                          });
+                        }
                       },
                       child: CircleAvatar(
                         radius: 45,
-                        backgroundImage: pickedImg != null
-                            ? FileImage(pickedImg!)
+                        backgroundImage: pickedImgBytes != null
+                            ? MemoryImage(pickedImgBytes!)
                             : (existingImg != null
-                                      ? NetworkImage(existingImg)
-                                      : null)
-                                  as ImageProvider?,
-                        child: (pickedImg == null && existingImg == null)
+                                ? NetworkImage(existingImg)
+                                : null) as ImageProvider?,
+                        child: (pickedImgBytes == null && existingImg == null)
                             ? const Icon(Icons.camera_alt, size: 30)
                             : null,
                       ),
@@ -124,30 +151,34 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
                       final hargaValue = num.tryParse(hargaCtrl.text) ?? 0;
 
                       if (data == null) {
+                        // Tambah produk baru
                         await productService.addProduct(
                           name: nameCtrl.text,
                           harga: hargaValue,
                           kategori: widget.title,
-                          image: pickedImg,
+                          imageData: (pickedImgBytes, pickedImgName),
                           stok: stokValue,
                         );
                       } else {
+                        // Update produk
                         await productService.updateProduct(
                           id: data['id'],
                           name: nameCtrl.text,
                           harga: hargaValue,
                           kategori: widget.title,
-                          image: pickedImg,
-                          stok: stokValue, // ← INI PENTING
+                          imageData: (pickedImgBytes, pickedImgName),
+                          stok: stokValue,
                         );
                       }
 
                       await fetchProducts();
                       if (mounted) Navigator.pop(context);
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Gagal simpan produk: $e")),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Gagal simpan produk: $e")),
+                        );
+                      }
                     }
                   },
                   child: const Text("Simpan"),
@@ -165,9 +196,11 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
       await productService.deleteProduct(id);
       await fetchProducts();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Gagal hapus produk: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal hapus produk: $e")),
+        );
+      }
     }
   }
 
@@ -198,8 +231,6 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const StokProdukScreen()),
                 );
-
-                // PENTING 🔥
                 await fetchProducts();
               },
               backgroundColor: const Color(0xFF5F6635),
@@ -269,84 +300,87 @@ class _KategoriProdukScreenState extends State<KategoriProdukScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : produkList.isEmpty
-                ? const Center(child: Text("Belum ada produk"))
-                : RefreshIndicator(
-                    onRefresh: fetchProducts,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: produkList.length,
-                      itemBuilder: (context, i) {
-                        final item = produkList[i];
-                        final stokList = item['STOK'] as List?;
-                        final stok = (stokList != null && stokList.isNotEmpty)
-                            ? stokList[0]['jumlah_stok']
-                            : 0;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCDE6A3),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(50),
-                                child: Image.network(
-                                  item["gambar"] ?? '',
-                                  width: 60,
-                                  height: 60,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.image),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item["nama_produk"],
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    Text(
-                                      "harga = ${item["harga_produk"]}",
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
+                    ? const Center(child: Text("Belum ada produk"))
+                    : RefreshIndicator(
+                        onRefresh: fetchProducts,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: produkList.length,
+                          itemBuilder: (context, i) {
+                            final item = produkList[i];
+                            final stokList = item['STOK'] as List<dynamic>? ?? [];
 
-                                    Text("stok = $stok kg"),
-                                  ],
-                                ),
+                            final stok = stokList.isNotEmpty
+                                ? (stokList.first['jumlah_stok'] as int? ?? 0)
+                                : 0;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFCDE6A3),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              Column(
+                              child: Row(
                                 children: [
-                                  IconButton(
-                                    onPressed: () =>
-                                        showProductPopup(data: item),
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Colors.black,
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(50),
+                                    child: Image.network(
+                                      item["gambar"] ?? '',
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.image),
                                     ),
                                   ),
-                                  IconButton(
-                                    onPressed: () => deleteProduct(item['id']),
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item["nama_produk"],
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          "harga = ${item["harga_produk"]}",
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                        Text("stok = $stok kg"),
+                                      ],
                                     ),
+                                  ),
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () =>
+                                            showProductPopup(data: item),
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        onPressed: () =>
+                                            deleteProduct(item['id']),
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                            );
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
